@@ -1,115 +1,24 @@
-# pipeline{
-#     agent any
+# Use a specific Node.js version with Alpine
+FROM node:25.8.1-alpine
 
-#      enviroment{
+# Set working directory
+WORKDIR /app
 
-# CONSTANER_NAME="nest-app"
-# IMAGE_NAME="nest-image"
-# EMAIL="satyaprakashsinghkasia@gmail.com"
-# PORT=4000
-        
-#     }
-#     stages {
-#         stage('clone repo'){
-#             steps{
-#                 git branch:'main', url:'https://github.com/SatyaSDE-1/docker-cicd.git'
-#             }
-#         }
-#         stage('Build docker image'){
-#             stages{
-#                 steps{
-#                     sh 'docker build -t $IMAGE_NAME'
-#                 }
-#             }
-#         }
-#         stage('stop and remove previous container'){
-#             stages{
-#                 steps{
-#                      sh '''
-#                      docker stop $CONSTANER_NAME || true
-#                      docker remove $CONSTANER_NAME
-#                         '''
-#                 }
-#             }
-#         }
-#         stage('docker container run'){
-#             stages{
-#                 steps{
-#                      sh '''
-#                      docker -d -p ${PORT}:${PORT}
-#                      --name $CONSTANER_NAME $IMAGE_NAME
-#                         '''
-#                 }
-#             }
-#         }
-#         stage('SEND EMAIL NOTIFICATION'){
-#             stages{
-#                 steps{
-#                     emailtext{
-#                         subject: "Nest app deployemtnsuceefully"
-#                         body:"your nest app deply"
-#                         to :`${EMAIL}`
-#                     }
-#                 }
-#             }
-#         } 
-#     }
-# }
+# Copy package.json and package-lock.json first
+COPY package*.json ./
 
+# Install dependencies
+RUN npm install
 
+# Copy all project files
+COPY . .
 
-pipeline {
-    agent any
+# Build the NestJS application
+RUN npm run build
 
-    environment {
-        CONTAINER_NAME = "nest-app"
-        IMAGE_NAME = "nest-image"
-        EMAIL = "satyaprakashsinghkasia@gmail.com"
-        PORT = "4000"
-    }
+# Expose the port your app runs on
+EXPOSE 4000
 
-    stages {
+# Start the application
+CMD ["node", "dist/main"]
 
-        stage('Clone Repository') {
-            steps {
-                echo "Cloning repository..."
-                git branch: 'main', url: 'https://github.com/SatyaSDE-1/docker-cicd.git'
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                echo "Building Docker image..."
-                sh "docker build -t $IMAGE_NAME ."
-            }
-        }
-
-        stage('Stop and Remove Previous Container') {
-            steps {
-                echo "Stopping and removing old container if exists..."
-                sh """
-                docker stop $CONTAINER_NAME || true
-                docker rm $CONTAINER_NAME || true
-                """
-            }
-        }
-
-        stage('Run Docker Container') {
-            steps {
-                echo "Running Docker container..."
-                sh "docker run -d -p ${PORT}:${PORT} --name $CONTAINER_NAME $IMAGE_NAME"
-            }
-        }
-
-    }
-
-    post {
-        failure {
-            emailext(
-                subject: "NestJS App Deployment Failed ❌",
-                body: "Deployment failed! Please check Jenkins logs.",
-                to: "${EMAIL}"
-            )
-        }
-    }
-}
