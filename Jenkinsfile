@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        OLD_CONTAINER = "nest-app"
-        NEW_CONTAINER = "nest-app-new"
+        CONTAINER_NAME = "nest-app"
         IMAGE_NAME = "nest-image"
+        EMAIL = "satyaprakashsinghkasia@gmail.com"
         PORT = "4000"
     }
 
@@ -12,40 +12,55 @@ pipeline {
 
         stage('Clone Repository') {
             steps {
+                echo "Cloning repository..."
                 git branch: 'main', url: 'https://github.com/SatyaSDE-1/docker-cicd.git'
             }
         }
 
-        stage('Build Image') {
+        stage('Build Docker Image') {
             steps {
-                sh "docker build -t $IMAGE_NAME ."
-            }
-        }
-
-        stage('Run New Container') {
-            steps {
+                echo "Building Docker image..."
                 sh """
-                docker rm -f $NEW_CONTAINER || true
-                docker run -d -p ${PORT}:${PORT} --name $NEW_CONTAINER $IMAGE_NAME
+                docker rmi $IMAGE_NAME || true
+                docker build -t $IMAGE_NAME .
                 """
             }
         }
 
-        stage('Health Check') {
+        stage('Stop and Remove Previous Container') {
             steps {
-                sh "sleep 10"
-                sh "docker ps | grep $NEW_CONTAINER"
+                echo "Stopping old container..."
+                sh """
+                docker stop $CONTAINER_NAME || true
+                docker rm $CONTAINER_NAME || true
+                """
             }
         }
 
-        stage('Switch Containers') {
+        stage('Run Docker Container') {
             steps {
+                echo "Starting new container..."
                 sh """
-                docker stop $OLD_CONTAINER || true
-                docker rm $OLD_CONTAINER || true
-                docker rename $NEW_CONTAINER $OLD_CONTAINER
+                docker run -d -p ${PORT}:${PORT} --restart=always \
+                --name $CONTAINER_NAME $IMAGE_NAME
                 """
             }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sh "docker ps"
+            }
+        }
+    }
+
+    post {
+        failure {
+            emailext(
+                subject: "NestJS Deployment Failed ❌",
+                body: "Deployment failed. Please check Jenkins logs.",
+                to: "${EMAIL}"
+            )
         }
     }
 }
