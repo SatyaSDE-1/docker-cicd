@@ -1,7 +1,3 @@
-
-
-
-
 pipeline {
     agent any
 
@@ -24,13 +20,16 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo "Building Docker image..."
-                sh "docker build -t $IMAGE_NAME ."
+                sh """
+                docker rmi $IMAGE_NAME || true
+                docker build -t $IMAGE_NAME .
+                """
             }
         }
 
         stage('Stop and Remove Previous Container') {
             steps {
-                echo "Stopping and removing old container if exists..."
+                echo "Stopping old container..."
                 sh """
                 docker stop $CONTAINER_NAME || true
                 docker rm $CONTAINER_NAME || true
@@ -40,18 +39,26 @@ pipeline {
 
         stage('Run Docker Container') {
             steps {
-                echo "Running Docker container..."
-                sh "docker run -d -p ${PORT}:${PORT} --name $CONTAINER_NAME $IMAGE_NAME"
+                echo "Starting new container..."
+                sh """
+                docker run -d -p ${PORT}:${PORT} --restart=always \
+                --name $CONTAINER_NAME $IMAGE_NAME
+                """
             }
         }
 
+        stage('Verify Deployment') {
+            steps {
+                sh "docker ps"
+            }
+        }
     }
 
     post {
         failure {
             emailext(
-                subject: "NestJS App Deployment Failed ❌",
-                body: "Deployment failed! Please check Jenkins logs.",
+                subject: "NestJS Deployment Failed ❌",
+                body: "Deployment failed. Please check Jenkins logs.",
                 to: "${EMAIL}"
             )
         }
